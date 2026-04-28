@@ -1,12 +1,14 @@
 import mysql.connector
 from mysql.connector import Error
+import os
 
-# Default connection settings - update these with your actual database credentials
+# Reads from environment variables (Streamlit Cloud) or falls back to Railway public URL for local dev
 DB_CONFIG = {
-    'host': 'localhost',
-    'database': 'hostel_db',
-    'user': 'root',
-    'password': 'Leena!123'
+    'host': os.environ.get("MYSQLHOST", "switchback.proxy.rlwy.net"),
+    'database': os.environ.get("MYSQL_DATABASE", "railway"),
+    'user': os.environ.get("MYSQLUSER", "root"),
+    'password': os.environ.get("MYSQLPASSWORD", "ZSItBptgvtNkvmymAcBFgGmNePMHBjNj"),
+    'port': int(os.environ.get("MYSQLPORT", 32270))
 }
 
 def create_connection():
