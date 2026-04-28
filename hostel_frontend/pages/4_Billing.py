@@ -7,75 +7,84 @@ from db import get_billing_by_student, process_payment
 
 require_login()
 
-st.set_page_config(page_title="Billing", page_icon=":material/payments:", layout="wide")
-st.title(":material/payments: Billing Details", anchor=False)
+st.set_page_config(page_title="Admin Billing", page_icon=":material/payments:", layout="wide")
+st.title(":material/payments: Billing Management", anchor=False)
 
-user_id = st.session_state.current_user_id
-billing_list = get_billing_by_student(user_id) or []
-billing = billing_list[0] if billing_list else {}
+billing = st.session_state.billing
+students = st.session_state.students
 
 # ------------------ OVERVIEW ------------------
-st.subheader(":material/receipt_long: Billing Overview", anchor=False)
+st.subheader(":material/insights: Billing Overview", anchor=False)
+
+total_revenue = 0
+pending_amount = 0
+paid_count = 0
+pending_count = 0
+
+for b in billing.values():
+    total_revenue += b.get("last_bill", 0)
+    if b.get("status") == "Paid":
+        paid_count += 1
+    else:
+        pending_count += 1
+        pending_amount += b.get("total_due", 0)
 
 c1, c2, c3, c4 = st.columns(4)
 
 with c1:
-    total_due = sum(float(b['Amount']) for b in billing_list if b['Status'] == 'Not Paid')
-    st.metric("Total Due", f"₹{total_due}")
-
+    st.metric("Total Revenue", f"₹{total_revenue}")
 with c2:
-    st.metric("Latest Bill", f"₹{billing.get('Amount', 0)}")
-
+    st.metric("Pending Amount", f"₹{pending_amount}")
 with c3:
-    st.metric("Due Date", str(billing.get("Due_Date", "N/A")))
-
+    st.metric("Paid Bills", paid_count)
 with c4:
-    status = billing.get("Status", "N/A")
-    st.metric(
-        "Status",
-        status,
-        delta="Paid" if status == "Paid" else "Action needed",
-        delta_color="normal" if status == "Paid" else "inverse"
-    )
+    st.metric("Pending Bills", pending_count)
 
 st.divider()
 
-# ------------------ HISTORY ------------------
-st.subheader(":material/history: Payment History", anchor=False)
+# ------------------ BILLING MANAGEMENT ------------------
+st.subheader(":material/table: Manage Billing", anchor=False)
 
-history = billing_list
+for student_id, bill in billing.items():
+    student = students.get(student_id, {})
 
-if history:
-    for bill in history:
-        col1, col2, col3 = st.columns([2, 2, 1])
+    col1, col2, col3, col4, col5 = st.columns([1.2, 1.5, 1.2, 1.2, 2])
 
-        with col1:
-            st.markdown(f"**₹{bill['Amount']}** [ID: {bill['Bill_ID']}]")
+    with col1:
+        st.markdown(f"**{student.get('name', 'Unknown')}**")
+        st.caption(f"ID: {student_id}")
 
-        with col2:
-            st.caption(f"Issued: {bill['Issue_Date']}")
+    with col2:
+        st.caption(f"Last Bill: ₹{bill.get('last_bill', 0)}")
+        st.caption(f"Total Due: ₹{bill.get('total_due', 0)}")
 
-        with col3:
-            if bill["Status"] == "Paid":
-                st.success("Paid")
-            else:
-                st.error("Not Paid")
-else:
-    st.info("No billing history available.")
+    with col3:
+        st.caption("Due Date")
+        st.write(bill.get("due_date", "N/A"))
 
-st.divider()
-
-# ------------------ QUICK ACTION ------------------
-st.subheader(":material/bolt: Quick Action", anchor=False)
-
-if billing.get("Status") == "Not Paid":
-    if st.button("Pay Now"):
-        success = process_payment(billing['Bill_ID'])
-        if success:
-            st.success("Payment marked as Paid successfully in Database!")
-            st.rerun()
+    with col4:
+        if bill.get("status") == "Paid":
+            st.success("Paid")
         else:
-            st.error("Engine failed to process MySQL payment.")
-else:
-    st.info("All payments are up to date.")
+            st.warning("Pending")
 
+    with col5:
+        if bill.get("status") == "Pending":
+            if st.button("Mark as Paid", key=f"pay_{student_id}"):
+                bill["status"] = "Paid"
+                st.success(f"{student.get('name')} marked as Paid")
+        else:
+            st.caption("No action")
+
+st.divider()
+
+# ------------------ QUICK INSIGHTS ------------------
+st.subheader(":material/insights: Insights", anchor=False)
+
+if pending_count > 0:
+    st.warning(f"{pending_count} students have pending payments.")
+else:
+    st.success("All payments are cleared.")
+
+if pending_amount > 0:
+    st.info(f"Total pending collection: ₹{pending_amount}")
