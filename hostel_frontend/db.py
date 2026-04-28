@@ -1,5 +1,8 @@
-import mysql.connector
-from mysql.connector import Error
+import pymysql
+import pymysql.cursors
+pymysql.install_as_MySQLdb()
+import MySQLdb as mysql_connector
+from MySQLdb import Error
 import os
 
 # Reads from environment variables (Streamlit Cloud) or falls back to Railway public URL for local dev
@@ -12,14 +15,10 @@ DB_CONFIG = {
 }
 
 def create_connection():
-    """
-    Creates and returns a connection to the hostel_db database.
-    """
     try:
-        connection = mysql.connector.connect(**DB_CONFIG)
-        if connection.is_connected():
-            return connection
-    except Error as e:
+        connection = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
+        return connection
+    except Exception as e:
         print(f"Error while connecting to MySQL: {e}")
         return None
 
