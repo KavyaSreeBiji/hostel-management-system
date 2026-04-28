@@ -4,7 +4,7 @@ import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import require_login
-from db import fetch_student_profile, update_student_profile
+from db import fetch_student_profile, update_student_profile, get_billing_by_student, process_payment
 
 require_login()
 
@@ -32,6 +32,36 @@ with st.container(border=True):
     with ocr2:
         total_due = student_data.get('Total_Due') or 0.00
         st.metric("Total Pending Balance", f"₹{total_due}")
+
+st.divider()
+
+# --- MY PENDING BILLS ---
+st.subheader("My Pending Bills", anchor=False)
+my_bills = get_billing_by_student(user_id)
+if my_bills:
+    pending_bills = [b for b in my_bills if b['Status'] == 'Not Paid']
+else:
+    pending_bills = []
+
+if not pending_bills:
+    st.info("You have no pending bills!")
+else:
+    for bill in pending_bills:
+        with st.container(border=True):
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                st.write(f"**Amount:** ₹{bill['Amount']}")
+                st.caption(f"Bill ID: {bill['Bill_ID']}")
+            with col2:
+                st.write(f"**Due Date:** {bill['Due_Date']}")
+                st.caption(f"Issued: {bill['Issue_Date']}")
+            with col3:
+                if st.button("Pay Now", key=f"pay_btn_{bill['Bill_ID']}", use_container_width=True):
+                    if process_payment(bill['Bill_ID']):
+                        st.success("Payment successful!")
+                        st.rerun()
+                    else:
+                        st.error("Payment failed.")
 
 st.divider()
 

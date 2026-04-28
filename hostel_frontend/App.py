@@ -105,7 +105,8 @@ else:
         pg = st.navigation({
             "Dashboard": [
                 st.Page(get_page_path("2_Admin_Dashboard.py"), title="Admin Dashboard", icon=":material/dashboard:"),
-                st.Page(get_page_path("3_Room_Allocation.py"), title="Room Allocation", icon=":material/hotel:")
+                st.Page(get_page_path("3_Room_Allocation.py"), title="Room Allocation", icon=":material/hotel:"),
+                st.Page(get_page_path("4_Billing.py"), title="Global Billing", icon=":material/payments:")
             ],
             "Account": [
                 st.Page(logout_page, title="Log Out", icon=":material/logout:")
@@ -116,7 +117,6 @@ else:
         pg = st.navigation({
             "Dashboard": [
                 st.Page(get_page_path("1_User_Dashboard.py"), title="Student Dashboard", icon=":material/dashboard:"),
-                st.Page(get_page_path("4_Billing.py"), title="Billing", icon=":material/payments:"),
                 st.Page(get_page_path("5_Complaints.py"), title="Complaints", icon=":material/campaign:")
             ],
             "Hostel Life": [
