@@ -7,69 +7,84 @@ from utils import init_mock_data, require_login
 init_mock_data()
 require_login()
 
-st.set_page_config(page_title="Billing", page_icon=":material/payments:", layout="wide")
-st.title(":material/payments: Billing Details", anchor=False)
+st.set_page_config(page_title="Admin Billing", page_icon=":material/payments:", layout="wide")
+st.title(":material/payments: Billing Management", anchor=False)
 
-user_id = st.session_state.current_user_id
-billing = st.session_state.billing.get(user_id, {})
+billing = st.session_state.billing
+students = st.session_state.students
 
 # ------------------ OVERVIEW ------------------
-st.subheader(":material/receipt_long: Billing Overview", anchor=False)
+st.subheader(":material/insights: Billing Overview", anchor=False)
+
+total_revenue = 0
+pending_amount = 0
+paid_count = 0
+pending_count = 0
+
+for b in billing.values():
+    total_revenue += b.get("last_bill", 0)
+    if b.get("status") == "Paid":
+        paid_count += 1
+    else:
+        pending_count += 1
+        pending_amount += b.get("total_due", 0)
 
 c1, c2, c3, c4 = st.columns(4)
 
 with c1:
-    st.metric("Total Due", f"₹{billing.get('total_due', 0)}")
-
+    st.metric("Total Revenue", f"₹{total_revenue}")
 with c2:
-    st.metric("Last Bill", f"₹{billing.get('last_bill', 0)}")
-
+    st.metric("Pending Amount", f"₹{pending_amount}")
 with c3:
-    st.metric("Due Date", billing.get("due_date", "N/A"))
-
+    st.metric("Paid Bills", paid_count)
 with c4:
-    status = billing.get("status", "N/A")
-    st.metric(
-        "Status",
-        status,
-        delta="Paid" if status == "Paid" else "Action needed",
-        delta_color="normal" if status == "Paid" else "inverse"
-    )
+    st.metric("Pending Bills", pending_count)
 
 st.divider()
 
-# ------------------ HISTORY ------------------
-st.subheader(":material/history: Payment History", anchor=False)
+# ------------------ BILLING MANAGEMENT ------------------
+st.subheader(":material/table: Manage Billing", anchor=False)
 
-history = billing.get("history", [])
+for student_id, bill in billing.items():
+    student = students.get(student_id, {})
 
-if history:
-    for bill in history:
-        col1, col2, col3 = st.columns([2, 2, 1])
+    col1, col2, col3, col4, col5 = st.columns([1.2, 1.5, 1.2, 1.2, 2])
 
-        with col1:
-            st.markdown(f"**₹{bill['amount']}**")
+    with col1:
+        st.markdown(f"**{student.get('name', 'Unknown')}**")
+        st.caption(f"ID: {student_id}")
 
-        with col2:
-            st.caption(bill["date"])
+    with col2:
+        st.caption(f"Last Bill: ₹{bill.get('last_bill', 0)}")
+        st.caption(f"Total Due: ₹{bill.get('total_due', 0)}")
 
-        with col3:
-            if bill["status"] == "Paid":
-                st.success("Paid")
-            else:
-                st.warning("Pending")
-else:
-    st.info("No billing history available.")
+    with col3:
+        st.caption("Due Date")
+        st.write(bill.get("due_date", "N/A"))
+
+    with col4:
+        if bill.get("status") == "Paid":
+            st.success("Paid")
+        else:
+            st.warning("Pending")
+
+    with col5:
+        if bill.get("status") == "Pending":
+            if st.button("Mark as Paid", key=f"pay_{student_id}"):
+                bill["status"] = "Paid"
+                st.success(f"{student.get('name')} marked as Paid")
+        else:
+            st.caption("No action")
 
 st.divider()
 
-# ------------------ QUICK ACTION ------------------
-st.subheader(":material/bolt: Quick Action", anchor=False)
+# ------------------ QUICK INSIGHTS ------------------
+st.subheader(":material/insights: Insights", anchor=False)
 
-if billing.get("status") == "Pending":
-    if st.button("Pay Now"):
-        billing["status"] = "Paid"
-        st.success("Payment marked as Paid (demo)")
+if pending_count > 0:
+    st.warning(f"{pending_count} students have pending payments.")
 else:
-    st.info("All payments are up to date.")
+    st.success("All payments are cleared.")
 
+if pending_amount > 0:
+    st.info(f"Total pending collection: ₹{pending_amount}")
