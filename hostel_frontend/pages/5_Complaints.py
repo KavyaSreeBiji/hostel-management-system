@@ -3,9 +3,9 @@ import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import init_mock_data, require_login
+from utils import require_login
+from db import submit_complaint, fetch_student_complaints
 
-init_mock_data()
 require_login()
 
 st.set_page_config(page_title="Complaints", page_icon=":material/campaign:", layout="centered")
@@ -23,28 +23,25 @@ with st.form("new_complaint_form"):
         if not description.strip():
             st.error("Please provide a description.")
         else:
-            new_id = len(st.session_state.complaints) + 1
-            st.session_state.complaints.append({
-                "id": new_id,
-                "student_id": user_id,
-                "category": category,
-                "description": description,
-                "status": "Pending"
-            })
-            st.success("Complaint submitted successfully!")
+            success = submit_complaint(user_id, category, description)
+            if success:
+                st.success("Complaint submitted securely to Database successfully!")
+                st.rerun()
+            else:
+                st.error("Failed to commit Complaint to Database.")
 
 st.divider()
 
 st.header("Your Past Complaints", anchor=False)
-user_complaints = [c for c in st.session_state.complaints if c["student_id"] == user_id]
+user_complaints = fetch_student_complaints(user_id) or []
 
 if not user_complaints:
     st.info("You haven't raised any complaints yet.")
 else:
-    for c in reversed(user_complaints):
-        with st.expander(f"[{c['status']}] {c['category']} - Complaint #{c['id']}"):
-            st.write(f"**Description:** {c['description']}")
-            if c['status'] == "Pending":
+    for c in user_complaints:
+        with st.expander(f"[{c['Status']}] {c['Category']} - Complaint #{c['Complaint_ID']}"):
+            st.write(f"**Description:** {c['Description']}")
+            if c['Status'] == "Pending":
                 st.warning("Status: Pending")
-            elif c['status'] == "Resolved":
+            elif c['Status'] == "Resolved":
                 st.success("Status: Resolved")

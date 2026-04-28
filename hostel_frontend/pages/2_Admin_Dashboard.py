@@ -2,28 +2,28 @@ import streamlit as st
 import sys, os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import init_mock_data, require_login
+from utils import require_login
+from db import fetch_all_students, fetch_all_rooms, fetch_all_billing, fetch_all_complaints
 
-init_mock_data()
 require_login()
 
 st.set_page_config(page_title="Admin Dashboard", page_icon=":material/dashboard:", layout="wide")
 st.title(":material/dashboard: Admin Dashboard", anchor=False)
 
 # ------------------ LOAD DATA ------------------
-students = st.session_state.students
-rooms = st.session_state.rooms
-billing = st.session_state.billing
-complaints = st.session_state.complaints
+students = fetch_all_students() or []
+rooms = fetch_all_rooms() or []
+billing = fetch_all_billing() or []
+complaints = fetch_all_complaints() or []
 
 # ------------------ TOP SUMMARY ------------------
 st.subheader(":material/insights: System Overview", anchor=False)
 
 total_students = len(students)
-available_rooms = sum(1 for r in rooms.values() if r["status"] == "Available")
-pending_complaints = sum(1 for c in complaints if c["status"] == "Pending")
+available_rooms = sum(1 for r in rooms if r.get("Availability_Status") == "Available")
+pending_complaints = sum(1 for c in complaints if c.get("Status") == "Pending")
 
-total_revenue = sum(b.get("last_bill", 0) for b in billing.values())
+total_revenue = sum(float(b.get("Amount", 0)) for b in billing)
 
 c1, c2, c3, c4 = st.columns(4)
 
@@ -44,12 +44,12 @@ pending_amount = 0
 paid_count = 0
 pending_count = 0
 
-for b in billing.values():
-    if b.get("status") == "Paid":
+for b in billing:
+    if b.get("Status") == "Paid":
         paid_count += 1
     else:
         pending_count += 1
-        pending_amount += b.get("total_due", 0)
+        pending_amount += float(b.get("Amount", 0))
 
 b1, b2, b3, b4 = st.columns(4)
 
@@ -79,61 +79,23 @@ with r3:
     st.metric("Full", full_rooms)
 
 # ------------------ ROOM MANAGEMENT ------------------
+st.info(f"{available_rooms} rooms available for allocation.")
+
+# ------------------ COMPLAINTS MANAGER ------------------
 st.divider()
-st.subheader(":material/table: Manage Room Allocation", anchor=False)
+st.subheader(":material/campaign: System Complaints", anchor=False)
 
-for room_id, room in rooms.items():
-    col1, col2, col3, col4, col5 = st.columns([1, 1.2, 1.2, 1.2, 2])
-
-    with col1:
-        st.markdown(f"**{room_id}**")
-
-    with col2:
-        st.caption(f"Capacity: {room['capacity']}")
-
-    with col3:
-        st.caption(f"Occupancy: {room['occupancy']}")
-
-    with col4:
-        if room["status"] == "Available":
-            st.success("Available")
-        else:
-            st.error("Full")
-
-    with col5:
-        available_students = [
-            sid for sid, s in students.items() if not s.get("room_id")
-        ]
-
-        if available_students and room["status"] == "Available":
-            selected = st.selectbox(
-                "Assign Student",
-                available_students,
-                format_func=lambda x: students[x]["name"],
-                key=f"admin_select_{room_id}"
-            )
-
-            if st.button("Allocate", key=f"admin_btn_{room_id}"):
-                students[selected]["room_id"] = room_id
-                room["occupancy"] += 1
-
-                if room["occupancy"] >= room["capacity"]:
-                    room["status"] = "Full"
-
-                st.success(f"{students[selected]['name']} assigned to Room {room_id}")
-        else:
-            st.caption("No action")
-
-# ------------------ QUICK INSIGHTS ------------------
-st.divider()
-st.subheader(":material/insights: System Insight", anchor=False)
-
-if pending_count > 0:
-    st.warning(f"{pending_count} payments are pending.")
+if not complaints:
+    st.info("No complaints submitted by students.")
 else:
-    st.success("All payments cleared.")
-
-if available_rooms == 0:
-    st.error("No rooms available.")
-else:
-    st.info(f"{available_rooms} rooms available for allocation.")
+    for c in complaints:
+        if c["Status"] == "Pending":
+            with st.expander(f"[ACTION REQUIRED] {c['Category']} from {c['Name']} (ID: {c['Student_ID']})"):
+                st.write(f"**Description:** {c['Description']}")
+                if st.button("Mark as Resolved", key=f"res_{c['Complaint_ID']}", type="primary"):
+                    from db import resolve_complaint
+                    if resolve_complaint(c['Complaint_ID']):
+                        st.success("Complaint resolved!")
+                        st.rerun()
+                    else:
+                        st.error("Engine failed to resolve.")

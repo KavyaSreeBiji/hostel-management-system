@@ -1,6 +1,13 @@
 import streamlit as st
 
 def init_mock_data():
+    if 'admins' not in st.session_state:
+        st.session_state.admins = {
+            "admin": {
+                "password": "password123",
+                "name": "Super Admin"
+            }
+        }
     if 'students' not in st.session_state:
         st.session_state.students = {
             "S101": {

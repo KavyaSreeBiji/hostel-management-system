@@ -3,40 +3,50 @@ import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import init_mock_data, require_login
+from utils import require_login
+from db import fetch_student_profile, get_billing_by_student, fetch_student_complaints
 
-init_mock_data()
 require_login()
 
 st.set_page_config(page_title="User Dashboard", page_icon=":material/dashboard:", layout="wide")
 st.title(":material/dashboard: User Dashboard", anchor=False)
 
 user_id = st.session_state.current_user_id
-student_data = st.session_state.students.get(user_id, {})
-room_id = student_data.get("room_id")
-room_data = st.session_state.rooms.get(room_id, {}) if room_id else {}
-billing_data = st.session_state.billing.get(user_id, {})
+students_db_data = fetch_student_profile(user_id)
+if not students_db_data:
+    st.error("Engine failed to locate core identity profile.")
+    st.stop()
 
-user_complaints = [c for c in st.session_state.complaints if c["student_id"] == user_id]
-pending_complaints = sum(1 for c in user_complaints if c["status"] == "Pending")
-latest_complaint_status = user_complaints[-1]["status"] if user_complaints else "No complaints"
+student_data = students_db_data
+room_id = student_data.get("Room_ID")
+
+# Calculate nested billing securely
+all_bills = get_billing_by_student(user_id) or []
+total_amount_due = float(student_data.get('Total_Due') or 0.00)
+last_bill = float(all_bills[0].get('Amount', 0.00)) if all_bills else 0.00
+latest_due = all_bills[0].get('Due_Date', 'N/A') if all_bills else "N/A"
+latest_status = all_bills[0].get('Status', 'N/A') if all_bills else "N/A"
+
+# Fetch complaints
+user_complaints = fetch_student_complaints(user_id) or []
+pending_complaints = sum(1 for c in user_complaints if c.get("Status") == "Pending")
+latest_complaint_status = user_complaints[0].get("Status", "No complaints") if user_complaints else "No complaints"
 
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader(":material/person: Basic Info", anchor=False)
-    st.write(f"**Name:** {student_data.get('name', 'N/A')}")
+    st.write(f"**Name:** {student_data.get('Name', 'N/A')}")
     st.write(f"**Student ID:** {user_id}")
-    st.write(f"**Email:** {student_data.get('email', 'N/A')}")
-    st.write(f"**Phone:** {student_data.get('phone', 'N/A')}")
+    st.write(f"**Email:** {student_data.get('Email', 'N/A')}")
+    st.write(f"**Phone:** {student_data.get('Phone', 'N/A')}")
 
 with col2:
     st.subheader(":material/meeting_room: Room Details", anchor=False)
     if room_id:
         st.write(f"**Room ID:** {room_id}")
-        st.write(f"**Capacity:** {room_data.get('capacity', 'N/A')}")
-        st.write(f"**Current Occupancy:** {room_data.get('occupancy', 'N/A')}")
-        st.write(f"**Availability Status:** {room_data.get('status', 'N/A')}")
+        st.write(f"**Capacity:** {student_data.get('Capacity', 'N/A')}")
+        st.write(f"**Room Value:** ₹{student_data.get('Price', 0.00)}")
     else:
         st.info("You have not been allocated a room yet.")
 
@@ -45,14 +55,13 @@ st.divider()
 st.subheader(":material/payments: Billing Summary", anchor=False)
 b_col1, b_col2, b_col3, b_col4 = st.columns(4)
 with b_col1:
-    st.metric("Total Amount Due", f"₹{billing_data.get('total_due', 0)}")
+    st.metric("Total Amount Due", f"₹{total_amount_due}")
 with b_col2:
-    st.metric("Last Bill Amount", f"₹{billing_data.get('last_bill', 0)}")
+    st.metric("Latest Inbound Bill", f"₹{last_bill}")
 with b_col3:
-    st.metric("Due Date", billing_data.get('due_date', 'N/A'))
+    st.metric("Next Due Date", str(latest_due))
 with b_col4:
-    status = billing_data.get('status', 'N/A')
-    st.metric("Payment Status", status, delta="Paid" if status == "Paid" else "-Action needed" if status == "Pending" else None, delta_color="normal" if status == "Paid" else "inverse")
+    st.metric("Latest Payment Status", latest_status, delta="Paid" if latest_status == "Paid" else "-Action needed" if latest_status == "Not Paid" else None, delta_color="normal" if latest_status == "Paid" else "inverse")
 
 st.divider()
 
