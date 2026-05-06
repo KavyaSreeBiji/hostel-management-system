@@ -1,6 +1,7 @@
 import streamlit as st
 import sys
 import os
+import re
 
 # Ensure the root directory is in sys.path so we can import utils
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -53,6 +54,10 @@ def login_page():
             if st.button("Register as Student", use_container_width=True):
                 if not new_name or not new_email or not new_password:
                     st.error("Name, Email, and Password are required!")
+                elif not re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', new_email):
+                    st.error("Invalid email format!")
+                elif new_phone and not re.match(r'^\+?[0-9\s-]{10,15}$', new_phone):
+                    st.error("Invalid phone number format!")
                 else:
                     success, result = register_student(new_name, new_email, new_phone, new_password)
                     if success:

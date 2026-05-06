@@ -1,6 +1,7 @@
 import streamlit as st
 import sys
 import os
+import re
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import require_login
@@ -80,11 +81,16 @@ with st.form("profile_form"):
     submitted = st.form_submit_button("Save Changes")
     
     if submitted:
-        success = update_student_profile(user_id, new_name, new_email, new_phone, new_password)
-            
-        if success:
-            st.session_state.current_user_name = new_name
-            st.success("Profile updated strictly to the Live Database successfully!")
-            st.rerun()
+        if new_email and not re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', new_email):
+            st.error("Invalid email format!")
+        elif new_phone and not re.match(r'^\+?[0-9\s-]{10,15}$', new_phone):
+            st.error("Invalid phone number format!")
         else:
-            st.error("Engine failed to synchronize with Live DB metrics.")
+            success = update_student_profile(user_id, new_name, new_email, new_phone, new_password)
+                
+            if success:
+                st.session_state.current_user_name = new_name
+                st.success("Profile updated strictly to the Live Database successfully!")
+                st.rerun()
+            else:
+                st.error("Engine failed to synchronize with Live DB metrics.")
